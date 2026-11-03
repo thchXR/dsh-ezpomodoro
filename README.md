@@ -1,4 +1,4 @@
-# dsh-pomodoro
+# dsh-ezpomodoro
 
 A small pomodoro clock for the DeepSeek Harness Web UI.
 
@@ -14,7 +14,7 @@ The pill lives at the bottom-right of the window (`shell.overlay`). Click it to 
 - `+` takes a Bilibili link, a bare `BV...` id, a favorites link such as `https://www.bilibili.com/list/ml775016702`, or the bare favorites number.
 - `×` removes the selected source.
 
-When a 收藏夹 is selected the panel adds a progress line under the row (`3/25 · title`) with a `下一集` button. Sources, the selection, the folder position and the current run are kept in `localStorage` under `dsh-pomodoro/v2` (a `v1` value is migrated on first load).
+When a 收藏夹 is selected the panel adds a progress line under the row (`3/25 · title`) with a `下一集` button. Sources, the selection, the folder position and the current run are kept in `localStorage` under `dsh-ezpomodoro/v2`. The keys this plugin used before it was renamed (`dsh-pomodoro/v2`, and `dsh-pomodoro/v1` before that) are still read on first load, so a rename loses no state.
 
 ## Menu bar countdown (macOS)
 
@@ -32,7 +32,7 @@ client.js  <--GET /plugin/pomodoro/menubar/commands--  index.js  <--stdout {"eve
 
 The helper is a single-file Cocoa program (`menubar/menubar.swift`): one `NSStatusItem`, no bundle, no signing, `DispatchSourceRead` on stdin so the run loop stays free, protocol lines on stdout and diagnostics on stderr. It never exits on `hide` — only on `quit` or stdin EOF.
 
-**Requirements and first run.** macOS plus a Swift toolchain (`swiftc` from the Xcode command line tools). The Host compiles the helper on the first request and caches the binary in `$DSH_HOME/storages/dsh-pomodoro/menubar` (with its own `swift-module-cache`, because swiftc's default clang module cache can be unwritable). Compilation takes a few seconds and is skipped until `menubar.swift` changes. When it cannot happen the POST answers `{ ok: false, reason, message }` with `reason` one of `unsupported` (not macOS), `no-toolchain`, `compile-failed` or `spawn-failed`, and the clock keeps working without a menu bar item — the Client treats every failure as silent. `DSH_POMODORO_HELPER_BIN` overrides the binary path for troubleshooting.
+**Requirements and first run.** macOS plus a Swift toolchain (`swiftc` from the Xcode command line tools). The Host compiles the helper on the first request and caches the binary in `$DSH_HOME/storages/dsh-ezpomodoro/menubar` (with its own `swift-module-cache`, because swiftc's default clang module cache can be unwritable). Compilation takes a few seconds and is skipped until `menubar.swift` changes. When it cannot happen the POST answers `{ ok: false, reason, message }` with `reason` one of `unsupported` (not macOS), `no-toolchain`, `compile-failed` or `spawn-failed`, and the clock keeps working without a menu bar item — the Client treats every failure as silent. `DSH_POMODORO_HELPER_BIN` overrides the binary path for troubleshooting.
 
 The helper is spawned as a child of the Host and dies with it, so a Host reload leaves no stale item. Because the clock lives in the renderer, closing the window freezes the menu bar item along with the timer; reopening the app resumes an unfinished run from `localStorage`.
 
@@ -55,5 +55,5 @@ It reads up to 100 videos over at most five pages and caches the result in memor
 | `index.js` | Host half: the favorites route, plus the menu bar routes, helper compilation and supervision. |
 | `client.js` | Browser half: the clock, chimes, player and favorites autoplay, registered into `shell.overlay`; mirrors the clock into the menu bar. |
 | `menubar/menubar.swift` | Native menu bar helper, compiled on demand by the Host. |
-| `cordis.patch.yml` | Inserts the `dsh-pomodoro` row. |
+| `cordis.patch.yml` | Inserts the `dsh-ezpomodoro` row. |
 | `locale/zh.json`, `locale/en.json` | Plugin title and description shown in the Plugins page. |

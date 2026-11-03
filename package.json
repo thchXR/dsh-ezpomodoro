@@ -1,5 +1,5 @@
 {
-  "name": "dsh-pomodoro",
+  "name": "dsh-ezpomodoro",
   "version": "1.0.0",
   "private": true,
   "description": "25/5 pomodoro clock for the DeepSeek Harness Web UI, with chimes and Bilibili white noise.",

@@ -1,5 +1,5 @@
 /**
- * dsh-pomodoro — menu bar helper.
+ * dsh-ezpomodoro — menu bar helper.
  *
  * A single-file Cocoa process spawned by the Host half, compiled by swiftc into
  * a bundle-less executable. It owns one NSStatusItem and speaks a line protocol
@@ -32,7 +32,7 @@ private func writeLine(_ line: String) {
 
 /// Log a diagnostic line on stderr.
 private func log(_ message: String) {
-    FileHandle.standardError.write(Data(("[dsh-pomodoro menubar] " + message + "\n").utf8))
+    FileHandle.standardError.write(Data(("[dsh-ezpomodoro menubar] " + message + "\n").utf8))
 }
 
 /// Quote a string for a hand-built JSON line.
@@ -151,7 +151,7 @@ private final class StatusController: NSObject {
 
 /// Line-delimited reader over STDIN_FILENO driven by GCD.
 private final class StdinLineReader {
-    private let queue = DispatchQueue(label: "dsh-pomodoro.menubar.stdin")
+    private let queue = DispatchQueue(label: "dsh-ezpomodoro.menubar.stdin")
     private let onLine: (String) -> Void
     private let onClose: () -> Void
     private var source: DispatchSourceRead?

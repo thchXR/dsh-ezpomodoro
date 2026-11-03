@@ -1,5 +1,5 @@
 /**
- * Host half of dsh-pomodoro.
+ * Host half of dsh-ezpomodoro.
  *
  * The clock, its chimes and the player live in the Client module. This half
  * adds one read-only loopback route, because the browser cannot read Bilibili's
@@ -37,7 +37,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const name = 'dsh-pomodoro';
+export const name = 'dsh-ezpomodoro';
 
 /** Required service: the route registry. */
 export const inject = ['webServer'];
@@ -60,7 +60,7 @@ const COMMANDS_ROUTE = MENUBAR_ROUTE + '/commands';
 /** Package root, used to find the bundled Swift source. */
 const PACKAGE_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const HELPER_SOURCE = path.join(PACKAGE_ROOT, 'menubar', 'menubar.swift');
-const HELPER_CACHE_DIR = path.join(process.env.DSH_HOME || path.join(homedir(), '.dsh'), 'storages', 'dsh-pomodoro');
+const HELPER_CACHE_DIR = path.join(process.env.DSH_HOME || path.join(homedir(), '.dsh'), 'storages', 'dsh-ezpomodoro');
 const HELPER_BIN = path.join(HELPER_CACHE_DIR, 'menubar');
 
 const COMPILE_TIMEOUT_MS = 60 * 1000;
@@ -327,7 +327,7 @@ function sendCommand(record, command) {
     try {
         record.proc.stdin.write(JSON.stringify(command) + '\n');
     } catch (error) {
-        console.error('[dsh-pomodoro] menu bar helper write failed: ' + String(error));
+        console.error('[dsh-ezpomodoro] menu bar helper write failed: ' + String(error));
     }
 }
 
@@ -373,14 +373,14 @@ function handleLine(record, line) {
         return;
     }
     if (message.event === 'error') {
-        console.warn('[dsh-pomodoro] menu bar helper error: ' + String(message.message));
+        console.warn('[dsh-ezpomodoro] menu bar helper error: ' + String(message.message));
     }
 }
 
 /** Arm one restart with exponential backoff, up to RESTART_LIMIT in a row. */
 function scheduleRestart(bin, code, signal) {
     if (restartCount >= RESTART_LIMIT) {
-        console.warn('[dsh-pomodoro] menu bar helper exited (' + String(code) + '/' + String(signal) + '); not restarting');
+        console.warn('[dsh-ezpomodoro] menu bar helper exited (' + String(code) + '/' + String(signal) + '); not restarting');
         return;
     }
     const delay = Math.min(RESTART_BASE_MS * 2 ** restartCount, RESTART_MAX_MS);
@@ -401,7 +401,7 @@ function startHelper(bin) {
     try {
         proc = spawn(bin, [], { stdio: ['pipe', 'pipe', 'pipe'] });
     } catch (error) {
-        console.error('[dsh-pomodoro] menu bar helper spawn failed: ' + String(error));
+        console.error('[dsh-ezpomodoro] menu bar helper spawn failed: ' + String(error));
         return null;
     }
 
@@ -432,14 +432,14 @@ function startHelper(bin) {
 
     proc.stdin.on('error', () => {});
     proc.on('error', (error) => {
-        console.error('[dsh-pomodoro] menu bar helper error: ' + String(error));
+        console.error('[dsh-ezpomodoro] menu bar helper error: ' + String(error));
     });
     proc.on('exit', (code, signal) => {
         for (const timer of record.timers) clearTimeout(timer);
         record.timers = [];
         if (helper === record) helper = null;
         if (record.stderr.length > 0) {
-            console.warn('[dsh-pomodoro] menu bar helper stderr: ' + record.stderr.join(' | '));
+            console.warn('[dsh-ezpomodoro] menu bar helper stderr: ' + record.stderr.join(' | '));
         }
         if (disposed) return;
         scheduleRestart(bin, code, signal);
@@ -632,13 +632,13 @@ export function apply(ctx) {
   resetHelper();
   ctx.effect(
     () => ctx.webServer.register({ kind: 'prefix', path: FAV_ROUTE, handler: serveFavorites }),
-    'dsh-pomodoro: favorites route',
+    'dsh-ezpomodoro: favorites route',
   );
   ctx.effect(
     () => ctx.webServer.register({ kind: 'prefix', path: MENUBAR_ROUTE, handler: serveMenuBar }),
-    'dsh-pomodoro: menu bar route',
+    'dsh-ezpomodoro: menu bar route',
   );
-  ctx.effect(() => stopHelper, 'dsh-pomodoro: menu bar helper');
+  ctx.effect(() => stopHelper, 'dsh-ezpomodoro: menu bar helper');
 }
 
 export default { name, inject, apply };

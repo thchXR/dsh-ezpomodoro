@@ -1,5 +1,5 @@
 /**
- * dsh-pomodoro — browser half.
+ * dsh-ezpomodoro — browser half.
  *
  * One frame-wide pill in the "shell.overlay" slot:
  *
@@ -21,15 +21,17 @@
  * noise keeps playing.
  */
 window.__ModuleLoader__.load({
-  id: 'dsh-pomodoro',
+  id: 'dsh-ezpomodoro',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
 
-    const NS = 'dsh-pomodoro';
+    const NS = 'dsh-ezpomodoro';
     const FOCUS_MS = 25 * 60 * 1000;
     const BREAK_MS = 5 * 60 * 1000;
-    const STORE_KEY = 'dsh-pomodoro/v2';
+    const STORE_KEY = 'dsh-ezpomodoro/v2';
+    /** Key written under the old plugin name, read once so the rename loses no state. */
+    const PREVIOUS_KEY = 'dsh-pomodoro/v2';
     const LEGACY_KEY = 'dsh-pomodoro/v1';
     const FAV_ROUTE = '/plugin/pomodoro/fav';
     const MENUBAR_ROUTE = '/plugin/pomodoro/menubar';
@@ -341,10 +343,11 @@ window.__ModuleLoader__.load({
 
     function readStore() {
       try {
-        const raw = window.localStorage.getItem(STORE_KEY);
-        if (raw !== null) {
+        for (const key of [STORE_KEY, PREVIOUS_KEY]) {
+          const raw = window.localStorage.getItem(key);
+          if (raw === null) continue;
           const value = JSON.parse(raw);
-          return value !== null && typeof value === 'object' ? value : null;
+          if (value !== null && typeof value === 'object') return value;
         }
         const legacy = window.localStorage.getItem(LEGACY_KEY);
         if (legacy === null) return null;
@@ -1166,10 +1169,10 @@ window.__ModuleLoader__.load({
           disposeZh();
           disposeEn();
         };
-      }, 'dsh-pomodoro: dictionaries');
+      }, 'dsh-ezpomodoro: dictionaries');
       ctx.slots.inject('shell.overlay', () =>
         ctx.slots.register(
-          { name: 'shell.overlay', id: 'dsh-pomodoro', order: 1003, label: () => t('title') },
+          { name: 'shell.overlay', id: 'dsh-ezpomodoro', order: 1003, label: () => t('title') },
           () => h(Pomodoro, { ctx }),
         ),
       );
