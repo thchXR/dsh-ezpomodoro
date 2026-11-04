@@ -39,6 +39,9 @@ window.__ModuleLoader__.load({
     const MENUBAR_POLL_MS = 500;
     const PLAYER_URL = 'https://player.bilibili.com/player.html';
     const FALLBACK_DURATION_S = 240;
+    const POSITION_KEY = 'dsh-ezpomodoro/position/v1';
+    const DRAG_MARGIN = 8;
+    const DRAG_THRESHOLD = 4;
 
     const DICTS = {
       zh: {
@@ -160,7 +163,9 @@ window.__ModuleLoader__.load({
       fontFamily: 'inherit',
       fontSize: '13px',
       lineHeight: 1,
-      cursor: 'pointer',
+      cursor: 'grab',
+      touchAction: 'none',
+      userSelect: 'none',
       boxShadow: '0 6px 20px rgba(0, 0, 0, 0.18)',
       fontVariantNumeric: 'tabular-nums',
     };
@@ -186,6 +191,9 @@ window.__ModuleLoader__.load({
       gap: '8px',
       fontSize: '12px',
       color: COLORS.textSecondary,
+      cursor: 'grab',
+      touchAction: 'none',
+      userSelect: 'none',
     };
 
     const CHIP_STYLE = {
@@ -367,6 +375,29 @@ window.__ModuleLoader__.load({
         window.localStorage.setItem(STORE_KEY, JSON.stringify(value));
       } catch (error) {
         /* private mode or a full quota: the timer still works for this page */
+      }
+    }
+
+    /** The saved overlay spot; null keeps the default bottom-right anchor. */
+    function readPosition() {
+      try {
+        const raw = window.localStorage.getItem(POSITION_KEY);
+        if (raw === null) return null;
+        const value = JSON.parse(raw);
+        if (value === null || typeof value !== 'object') return null;
+        const x = Number(value.x);
+        const y = Number(value.y);
+        return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function writePosition(position) {
+      try {
+        window.localStorage.setItem(POSITION_KEY, JSON.stringify(position));
+      } catch (error) {
+        /* a full quota only costs the remembered spot */
       }
     }
 
@@ -621,6 +652,10 @@ window.__ModuleLoader__.load({
       const [fav, setFav] = React.useState(EMPTY_FAV);
       const [favToken, setFavToken] = React.useState(0);
       const menubarShown = React.useRef(false);
+      const [pos, setPos] = React.useState(readPosition);
+      const rootRef = React.useRef(null);
+      const dragRef = React.useRef(null);
+      const draggedRef = React.useRef(false);
 
       const running = state.status === 'running';
       const total = durationOf(state.mode);
@@ -905,6 +940,85 @@ window.__ModuleLoader__.load({
         background: running ? (state.mode === 'focus' ? COLORS.brand : COLORS.success) : COLORS.idle,
       });
 
+      /** Keep the whole overlay inside the viewport, with a small margin. */
+      function clampPosition(position) {
+        const root = rootRef.current;
+        const width = root === null ? 0 : root.offsetWidth;
+        const height = root === null ? 0 : root.offsetHeight;
+        const maxX = Math.max(DRAG_MARGIN, window.innerWidth - width - DRAG_MARGIN);
+        const maxY = Math.max(DRAG_MARGIN, window.innerHeight - height - DRAG_MARGIN);
+        return {
+          x: Math.min(Math.max(DRAG_MARGIN, position.x), maxX),
+          y: Math.min(Math.max(DRAG_MARGIN, position.y), maxY),
+        };
+      }
+
+      // A shrink or a wider panel must not strand the clock off-screen.
+      React.useEffect(() => {
+        if (pos === null) return undefined;
+        setPos((current) => (current === null ? current : clampPosition(current)));
+        const onResize = () => setPos((current) => (current === null ? current : clampPosition(current)));
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+      }, [expanded, pos === null]);
+
+      // Pointer drag shared by the pill and the panel header. A click only
+      // opens the panel when the pointer never travelled past the threshold.
+      const dragProps = {
+        onPointerDown(event) {
+          if (event.button !== 0) return;
+          const target = event.target;
+          const interactive =
+            target !== null && typeof target.closest === 'function'
+              ? target.closest('button,select,input,a,textarea')
+              : null;
+          if (interactive !== null && interactive !== event.currentTarget) return;
+          const root = rootRef.current;
+          if (root === null) return;
+          const rect = root.getBoundingClientRect();
+          dragRef.current = {
+            id: event.pointerId,
+            pointerX: event.clientX,
+            pointerY: event.clientY,
+            offsetX: event.clientX - rect.left,
+            offsetY: event.clientY - rect.top,
+            moved: false,
+            last: null,
+          };
+          draggedRef.current = false;
+          if (typeof event.currentTarget.setPointerCapture === 'function') {
+            try {
+              event.currentTarget.setPointerCapture(event.pointerId);
+            } catch (error) {
+              /* a stale pointer id only costs the capture */
+            }
+          }
+        },
+        onPointerMove(event) {
+          const drag = dragRef.current;
+          if (drag === null || drag.id !== event.pointerId) return;
+          if (!drag.moved) {
+            const dx = event.clientX - drag.pointerX;
+            const dy = event.clientY - drag.pointerY;
+            if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+            drag.moved = true;
+            draggedRef.current = true;
+          }
+          const next = clampPosition({ x: event.clientX - drag.offsetX, y: event.clientY - drag.offsetY });
+          drag.last = next;
+          setPos(next);
+        },
+        onPointerUp(event) {
+          const drag = dragRef.current;
+          if (drag === null || drag.id !== event.pointerId) return;
+          dragRef.current = null;
+          if (drag.last !== null) writePosition(drag.last);
+        },
+        onPointerCancel() {
+          dragRef.current = null;
+        },
+      };
+
       const pill = h(
         'button',
         {
@@ -912,7 +1026,14 @@ window.__ModuleLoader__.load({
           type: 'button',
           className: 'dsh-pomo-pill',
           style: PILL_STYLE,
-          onClick: () => setExpanded(true),
+          ...dragProps,
+          onClick: () => {
+            if (draggedRef.current) {
+              draggedRef.current = false;
+              return;
+            }
+            setExpanded(true);
+          },
           title: t('expand'),
           'aria-expanded': expanded,
           'aria-label': t('expand'),
@@ -1084,7 +1205,7 @@ window.__ModuleLoader__.load({
       ]);
 
       const card = h('div', { key: 'card', style: CARD_STYLE, role: 'dialog', 'aria-label': t('title') }, [
-        h('div', { key: 'header', style: HEADER_STYLE }, [
+        h('div', { key: 'header', style: HEADER_STYLE, ...dragProps }, [
           h('span', { key: 'title', style: { fontWeight: 600, color: COLORS.text } }, t('title')),
           h('span', { key: 'chip', style: CHIP_STYLE }, t(state.mode === 'focus' ? 'focus' : 'rest')),
           h('span', { key: 'spacer', style: { flex: '1' } }),
@@ -1149,7 +1270,17 @@ window.__ModuleLoader__.load({
           : h('div', { key: 'notice', style: { fontSize: '11px', color: COLORS.warn } }, notice),
       ]);
 
-      return h('div', { className: 'dsh-pomo-root', style: ROOT_STYLE }, [
+      const rootStyle =
+        pos === null
+          ? ROOT_STYLE
+          : Object.assign({}, ROOT_STYLE, {
+              left: pos.x + 'px',
+              top: pos.y + 'px',
+              right: 'auto',
+              bottom: 'auto',
+            });
+
+      return h('div', { className: 'dsh-pomo-root', ref: rootRef, style: rootStyle }, [
         h('style', { key: 'style' }, STYLE_TEXT),
         player,
         expanded ? card : pill,

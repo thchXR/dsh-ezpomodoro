@@ -1,11 +1,16 @@
 # dsh-ezpomodoro
 
+English · [中文](README.zh.md)
+
 A small pomodoro clock for the DeepSeek Harness Web UI.
 
 - **25 / 5**: 25 minutes of focus, 5 minutes of rest, rolling over automatically.
 - **Chimes on start and stop**: two rising notes when a run starts, three notes when a phase ends, two falling notes when you pause or reset (synthesised with Web Audio, no audio files).
 - **Menu bar countdown (macOS)**: while the clock runs the remaining time also sits in the macOS menu bar as `🍅 24:59` (focus) or `🍵 04:59` (rest). See [Menu bar countdown](#menu-bar-countdown-macos).
 - **Bilibili white noise**: during focus an embedded Bilibili player plays the selected source. The source is either one long video or a 收藏夹 (favorites folder); a folder plays its videos one after another, advancing on each video's own duration and looping back at the end. The player is mounted once and made transparent while the panel is collapsed, so the noise keeps playing.
+- **Draggable**: the overlay sits at the bottom-right until you move it, so it never has to fight another plugin for that corner. See [Moving it](#moving-it).
+
+## Using it
 
 The pill lives at the bottom-right of the window (`shell.overlay`). Click it to open the panel; – collapses it again. The panel holds the clock, the phase progress bar, start/pause, reset, and the white-noise row:
 
@@ -15,6 +20,12 @@ The pill lives at the bottom-right of the window (`shell.overlay`). Click it to 
 - `×` removes the selected source.
 
 When a 收藏夹 is selected the panel adds a progress line under the row (`3/25 · title`) with a `下一集` button. Sources, the selection, the folder position and the current run are kept in `localStorage` under `dsh-ezpomodoro/v2`. The keys this plugin used before it was renamed (`dsh-pomodoro/v2`, and `dsh-pomodoro/v1` before that) are still read on first load, so a rename loses no state.
+
+### Moving it
+
+Drag the pill anywhere; while the panel is open, drag it by its header (the row with the title and –), so the select, the input and the buttons keep behaving normally. A press that never travels more than a few pixels is still a click and opens the panel.
+
+The spot is remembered under `dsh-ezpomodoro/position/v1` and clamped back inside the viewport whenever the window shrinks or the panel changes size, so the clock can be parked out of another plugin's way without ever being lost off-screen. There is no snapping to edges: wherever you drop it is where it stays. Deleting that key, or the whole entry in DevTools → Application → Local Storage, restores the default bottom-right anchor.
 
 ## Menu bar countdown (macOS)
 
@@ -53,7 +64,7 @@ It reads up to 100 videos over at most five pages and caches the result in memor
 | File | Role |
 | --- | --- |
 | `index.js` | Host half: the favorites route, plus the menu bar routes, helper compilation and supervision. |
-| `client.js` | Browser half: the clock, chimes, player and favorites autoplay, registered into `shell.overlay`; mirrors the clock into the menu bar. |
+| `client.js` | Browser half: the clock, chimes, player and favorites autoplay, registered into `shell.overlay`; mirrors the clock into the menu bar and owns the drag position. |
 | `menubar/menubar.swift` | Native menu bar helper, compiled on demand by the Host. |
 | `cordis.patch.yml` | Inserts the `dsh-ezpomodoro` row. |
 | `locale/zh.json`, `locale/en.json` | Plugin title and description shown in the Plugins page. |
