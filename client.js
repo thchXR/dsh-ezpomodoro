@@ -1087,16 +1087,16 @@ window.__ModuleLoader__.load({
             className: 'dsh-pomo-btn',
             style: Object.assign({}, BUTTON_STYLE, {
               flex: '1',
-              textAlign: 'left',
-              color: state.autoNext ? COLORS.brand : COLORS.textSecondary,
+              background: state.autoNext ? COLORS.brand : 'transparent',
               borderColor: state.autoNext ? COLORS.brand : COLORS.borderStrong,
+              color: state.autoNext ? '#ffffff' : COLORS.text,
             }),
             onClick: toggleAutoNext,
             title: t('autoNext'),
             'aria-label': t('autoNext'),
             'aria-pressed': state.autoNext,
           },
-          (state.autoNext ? '\u2611 ' : '\u2610 ') + t('autoNext'),
+          t('autoNext'),
         ),
       ]);
 
