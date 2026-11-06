@@ -380,16 +380,24 @@ window.__ModuleLoader__.load({
       }
     }
 
-    /** The saved overlay spot; null keeps the default bottom-right anchor. */
+    /**
+     * The saved spot as a top-right corner: `right` is the gap to the viewport's
+     * right edge, `top` the distance from the top. Null keeps the default.
+     */
     function readPosition() {
       try {
         const raw = window.localStorage.getItem(POSITION_KEY);
         if (raw === null) return null;
         const value = JSON.parse(raw);
         if (value === null || typeof value !== 'object') return null;
+        const right = Number(value.right);
+        const top = Number(value.top);
+        if (Number.isFinite(right) && Number.isFinite(top)) return { right, top };
+        // Spots saved before the corner moved: x was the left edge.
         const x = Number(value.x);
         const y = Number(value.y);
-        return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+        return { right: Math.max(DRAG_MARGIN, window.innerWidth - x), top: y };
       } catch (error) {
         return null;
       }
@@ -959,11 +967,11 @@ window.__ModuleLoader__.load({
         const root = rootRef.current;
         const width = root === null ? 0 : root.offsetWidth;
         const height = root === null ? 0 : root.offsetHeight;
-        const maxX = Math.max(DRAG_MARGIN, window.innerWidth - width - DRAG_MARGIN);
-        const maxY = Math.max(DRAG_MARGIN, window.innerHeight - height - DRAG_MARGIN);
+        const maxRight = Math.max(DRAG_MARGIN, window.innerWidth - width - DRAG_MARGIN);
+        const maxTop = Math.max(DRAG_MARGIN, window.innerHeight - height - DRAG_MARGIN);
         return {
-          x: Math.min(Math.max(DRAG_MARGIN, position.x), maxX),
-          y: Math.min(Math.max(DRAG_MARGIN, position.y), maxY),
+          right: Math.min(Math.max(DRAG_MARGIN, position.right), maxRight),
+          top: Math.min(Math.max(DRAG_MARGIN, position.top), maxTop),
         };
       }
 
@@ -974,13 +982,21 @@ window.__ModuleLoader__.load({
           setViewPos(null);
           return undefined;
         }
-        const place = () => {
+        const next = clampPosition(pos);
+        setViewPos((current) => (current !== null && current.right === next.right && current.top === next.top ? current : next));
+        return undefined;
+      }, [pos, expanded]);
+
+      // A window that shrinks pulls the bubble in for real, and remembers it.
+      React.useEffect(() => {
+        if (pos === null) return undefined;
+        const pull = () => {
           const next = clampPosition(pos);
-          setViewPos((current) => (current !== null && current.x === next.x && current.y === next.y ? current : next));
+          setPos(next);
+          writePosition(next);
         };
-        place();
-        window.addEventListener('resize', place);
-        return () => window.removeEventListener('resize', place);
+        window.addEventListener('resize', pull);
+        return () => window.removeEventListener('resize', pull);
       }, [pos, expanded]);
 
       // Pointer drag shared by the pill and the panel header. A click only
@@ -1001,8 +1017,8 @@ window.__ModuleLoader__.load({
             id: event.pointerId,
             pointerX: event.clientX,
             pointerY: event.clientY,
-            offsetX: event.clientX - rect.left,
-            offsetY: event.clientY - rect.top,
+            rightGap: rect.right - event.clientX,
+            topGap: event.clientY - rect.top,
             moved: false,
             last: null,
           };
@@ -1025,7 +1041,10 @@ window.__ModuleLoader__.load({
             drag.moved = true;
             draggedRef.current = true;
           }
-          const next = clampPosition({ x: event.clientX - drag.offsetX, y: event.clientY - drag.offsetY });
+          const next = clampPosition({
+            right: window.innerWidth - (event.clientX + drag.rightGap),
+            top: event.clientY - drag.topGap,
+          });
           drag.last = next;
           setPos(next);
         },
@@ -1086,15 +1105,15 @@ window.__ModuleLoader__.load({
         );
       }
 
-      const autoNextRow = h('div', { key: 'auto-next-row', style: { display: 'flex', gap: '6px' } }, [
+      const autoNextRow = h('div', { key: 'auto-next-row', style: { display: 'flex', justifyContent: 'flex-end' } }, [
         h(
           'button',
           {
             key: 'auto-next',
             type: 'button',
             className: 'dsh-pomo-btn',
-            style: Object.assign({}, BUTTON_STYLE, {
-              flex: '1',
+            style: Object.assign({}, MINI_BUTTON_STYLE, {
+              padding: '0 10px',
               background: state.autoNext ? COLORS.brand : 'transparent',
               borderColor: state.autoNext ? COLORS.brand : COLORS.borderStrong,
               color: state.autoNext ? '#ffffff' : COLORS.text,
@@ -1318,9 +1337,9 @@ window.__ModuleLoader__.load({
         viewPos === null
           ? ROOT_STYLE
           : Object.assign({}, ROOT_STYLE, {
-              left: viewPos.x + 'px',
-              top: viewPos.y + 'px',
-              right: 'auto',
+              right: viewPos.right + 'px',
+              top: viewPos.top + 'px',
+              left: 'auto',
               bottom: 'auto',
             });
 
