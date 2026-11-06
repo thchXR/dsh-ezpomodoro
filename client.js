@@ -656,6 +656,7 @@ window.__ModuleLoader__.load({
       const [favToken, setFavToken] = React.useState(0);
       const menubarShown = React.useRef(false);
       const [pos, setPos] = React.useState(readPosition);
+      const [viewPos, setViewPos] = React.useState(readPosition);
       const rootRef = React.useRef(null);
       const dragRef = React.useRef(null);
       const draggedRef = React.useRef(false);
@@ -966,14 +967,21 @@ window.__ModuleLoader__.load({
         };
       }
 
-      // A shrink or a wider panel must not strand the clock off-screen.
+      // The remembered spot is clamped for display only: widening to the panel
+      // or shrinking back to the pill never rewrites where the bubble sits.
       React.useEffect(() => {
-        if (pos === null) return undefined;
-        setPos((current) => (current === null ? current : clampPosition(current)));
-        const onResize = () => setPos((current) => (current === null ? current : clampPosition(current)));
-        window.addEventListener('resize', onResize);
-        return () => window.removeEventListener('resize', onResize);
-      }, [expanded, pos === null]);
+        if (pos === null) {
+          setViewPos(null);
+          return undefined;
+        }
+        const place = () => {
+          const next = clampPosition(pos);
+          setViewPos((current) => (current !== null && current.x === next.x && current.y === next.y ? current : next));
+        };
+        place();
+        window.addEventListener('resize', place);
+        return () => window.removeEventListener('resize', place);
+      }, [pos, expanded]);
 
       // Pointer drag shared by the pill and the panel header. A click only
       // opens the panel when the pointer never travelled past the threshold.
@@ -1307,11 +1315,11 @@ window.__ModuleLoader__.load({
       ]);
 
       const rootStyle =
-        pos === null
+        viewPos === null
           ? ROOT_STYLE
           : Object.assign({}, ROOT_STYLE, {
-              left: pos.x + 'px',
-              top: pos.y + 'px',
+              left: viewPos.x + 'px',
+              top: viewPos.y + 'px',
               right: 'auto',
               bottom: 'auto',
             });
