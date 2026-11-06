@@ -71,6 +71,7 @@ window.__ModuleLoader__.load({
         favEmpty: '收藏夹里没有可播放的视频',
         retry: '重试',
         next: '下一集',
+        autoNext: '连续下一轮',
       },
       en: {
         title: 'Pomodoro',
@@ -99,6 +100,7 @@ window.__ModuleLoader__.load({
         favEmpty: 'No playable videos in that folder',
         retry: 'Retry',
         next: 'Next',
+        autoNext: 'Auto next round',
       },
     };
 
@@ -442,6 +444,7 @@ window.__ModuleLoader__.load({
         sourceKey: sources.some((source) => keyOf(source) === savedKey) ? savedKey : keyOf(sources[0]),
         favIndex: 0,
         noise: saved === null || saved.noise !== false,
+        autoNext: saved === null ? false : saved.autoNext === true,
       };
       if (saved !== null && Number.isInteger(saved.favIndex) && saved.favIndex >= 0) state.favIndex = saved.favIndex;
       if (
@@ -749,17 +752,23 @@ window.__ModuleLoader__.load({
           sourceKey: state.sourceKey,
           favIndex: state.favIndex,
           noise: state.noise,
+          autoNext: state.autoNext,
         });
-      }, [state.mode, state.status, state.endsAt, state.sources, state.sourceKey, state.favIndex, state.noise]);
+      }, [state.mode, state.status, state.endsAt, state.sources, state.sourceKey, state.favIndex, state.noise, state.autoNext]);
 
       React.useEffect(() => {
         if (!running || state.endsAt === 0 || now < state.endsAt) return;
         playChime('end');
-        setState((prev) =>
-          prev.mode === 'focus'
-            ? Object.assign({}, prev, { mode: 'break', status: 'running', endsAt: Date.now() + BREAK_MS, remainingMs: BREAK_MS })
-            : Object.assign({}, prev, { mode: 'focus', status: 'idle', endsAt: 0, remainingMs: FOCUS_MS }),
-        );
+        setState((prev) => {
+          if (prev.mode === 'focus') {
+            return Object.assign({}, prev, { mode: 'break', status: 'running', endsAt: Date.now() + BREAK_MS, remainingMs: BREAK_MS });
+          }
+          // Auto next round rolls straight into focus; unset, the clock waits for the user.
+          if (prev.autoNext) {
+            return Object.assign({}, prev, { mode: 'focus', status: 'running', endsAt: Date.now() + FOCUS_MS, remainingMs: FOCUS_MS });
+          }
+          return Object.assign({}, prev, { mode: 'focus', status: 'idle', endsAt: 0, remainingMs: FOCUS_MS });
+        });
       }, [now, running, state.endsAt]);
 
       // Read the selected folder once. Dependencies are only the source and an
@@ -847,6 +856,10 @@ window.__ModuleLoader__.load({
 
       function toggleNoise() {
         setState((prev) => Object.assign({}, prev, { noise: !prev.noise }));
+      }
+
+      function toggleAutoNext() {
+        setState((prev) => Object.assign({}, prev, { autoNext: !prev.autoNext }));
       }
 
       function selectSource(key) {
@@ -1065,6 +1078,28 @@ window.__ModuleLoader__.load({
         );
       }
 
+      const autoNextRow = h('div', { key: 'auto-next-row', style: { display: 'flex', gap: '6px' } }, [
+        h(
+          'button',
+          {
+            key: 'auto-next',
+            type: 'button',
+            className: 'dsh-pomo-btn',
+            style: Object.assign({}, BUTTON_STYLE, {
+              flex: '1',
+              textAlign: 'left',
+              color: state.autoNext ? COLORS.brand : COLORS.textSecondary,
+              borderColor: state.autoNext ? COLORS.brand : COLORS.borderStrong,
+            }),
+            onClick: toggleAutoNext,
+            title: t('autoNext'),
+            'aria-label': t('autoNext'),
+            'aria-pressed': state.autoNext,
+          },
+          (state.autoNext ? '\u2611 ' : '\u2610 ') + t('autoNext'),
+        ),
+      ]);
+
       const noiseRow = h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
         h(
           'button',
@@ -1262,6 +1297,7 @@ window.__ModuleLoader__.load({
             t('reset'),
           ),
         ]),
+        autoNextRow,
         noiseRow,
         favLine,
         adding ? addRow : null,
